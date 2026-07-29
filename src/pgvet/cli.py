@@ -75,15 +75,19 @@ def launch_tui() -> int:
     from pgvet.storage.history import History
     from pgvet.tui.app import PgvetApp
 
-    conn = Connection.connect(Settings.from_env())
-    history = History(_default_history_path())
-    session = Session(conn=conn, registry=_registry(),
-                      history=history, git_ref=current_git_ref())
+    conn = None
+    history = None
     try:
+        conn = Connection.connect(Settings.from_env())
+        history = History(_default_history_path())
+        session = Session(conn=conn, registry=_registry(),
+                          history=history, git_ref=current_git_ref())
         PgvetApp(analyze_query=session.run_query).run()
     finally:
-        history.close()
-        conn.close()
+        if history is not None:
+            history.close()
+        if conn is not None:
+            conn.close()
     return 0
 
 
