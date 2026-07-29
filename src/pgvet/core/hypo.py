@@ -24,3 +24,31 @@ def create_hypothetical_index(conn, create_index_sql: str) -> int:
 def reset_hypothetical(conn) -> None:
     """Drop all hypothetical indexes for this session."""
     conn.fetch_one("SELECT hypopg_reset()")
+
+
+from dataclasses import dataclass
+
+from pgvet.core.explain import run_explain
+from pgvet.core.plandiff import PlanDiff, diff_plans
+from pgvet.core.planmodel import PlanTree
+
+
+@dataclass
+class HypoResult:
+    baseline: PlanTree
+    candidate: PlanTree
+    diff: PlanDiff
+
+
+def try_hypothetical_index(conn, sql: str, create_index_sql: str) -> HypoResult:
+    """Estimate the effect of `create_index_sql` on `sql` without building the index.
+
+    Uses EXPLAIN WITHOUT ANALYZE on both sides (hypothetical indexes affect only
+    the planner's estimates). Always resets hypothetical indexes afterwards."""
+    baseline = run_explain(conn, sql, analyze=False)
+    try:
+        create_hypothetical_index(conn, create_index_sql)
+        candidate = run_explain(conn, sql, analyze=False)
+    finally:
+        reset_hypothetical(conn)
+    return HypoResult(baseline=baseline, candidate=candidate, diff=diff_plans(baseline, candidate))
