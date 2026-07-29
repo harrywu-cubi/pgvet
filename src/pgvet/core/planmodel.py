@@ -84,3 +84,16 @@ class PlanTree:
             node = stack.pop(0)
             yield node
             stack = node.children + stack
+
+    def to_payload(self) -> list:
+        """Reconstruct the EXPLAIN (FORMAT JSON) payload this tree came from.
+
+        `root.raw` is the original "Plan" dict (with nested "Plans"), so re-wrapping
+        it with the timings yields a structure parse_explain_json accepts."""
+        return [
+            {
+                "Plan": self.root.raw,
+                "Planning Time": self.planning_time_ms,
+                "Execution Time": self.execution_time_ms,
+            }
+        ]
