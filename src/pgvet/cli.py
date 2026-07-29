@@ -86,14 +86,24 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("plugins", help="list discovered plugins")
 
     args = parser.parse_args(argv)
-    if args.command == "report":
-        print(report_from_plan_file(args.plan_file, fmt=args.format))
-        return 0
-    if args.command == "plugins":
-        print(plugins_listing())
-        return 0
-    if args.command == "tui":
-        return launch_tui()
+    try:
+        if args.command == "report":
+            print(report_from_plan_file(args.plan_file, fmt=args.format))
+            return 0
+        if args.command == "plugins":
+            print(plugins_listing())
+            return 0
+        if args.command == "tui":
+            return launch_tui()
+    except FileNotFoundError as exc:
+        print(f"error: file not found: {exc.filename or exc}", file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as exc:
+        print(f"error: could not parse plan JSON: {exc}", file=sys.stderr)
+        return 2
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     return 1
 
 
