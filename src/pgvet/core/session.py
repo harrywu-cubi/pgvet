@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from pgvet.core.explain import parse_explain_json, run_explain
 from pgvet.core.findings import Finding, Severity
