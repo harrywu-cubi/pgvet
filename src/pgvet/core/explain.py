@@ -29,3 +29,16 @@ def parse_explain_json(payload) -> PlanTree:
         planning_time_ms=top.get("Planning Time"),
         execution_time_ms=top.get("Execution Time"),
     )
+
+
+def run_explain(conn, sql: str, analyze: bool = True) -> PlanTree:
+    """Run EXPLAIN on `sql` via a Connection-like object and parse the result.
+
+    `conn` must expose `fetch_one(sql) -> dict` (see core.connection.Connection).
+    """
+    options = "ANALYZE, BUFFERS, FORMAT JSON" if analyze else "BUFFERS, FORMAT JSON"
+    row = conn.fetch_one(f"EXPLAIN ({options}) {sql}")
+    payload = row["QUERY PLAN"]
+    tree = parse_explain_json(payload)
+    tree.query = sql
+    return tree
