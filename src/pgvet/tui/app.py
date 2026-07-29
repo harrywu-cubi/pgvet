@@ -7,11 +7,12 @@ from typing import Callable
 
 from rich.console import Group
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Input, Static
 
 from pgvet.core.session import RunResult
 from pgvet.tui.panels.findings import render_findings
+from pgvet.tui.panels.plan_diff import render_plan_diff
 from pgvet.tui.panels.plan_tree import render_plan_tree
 
 
@@ -32,7 +33,9 @@ class PgvetApp(App):
         yield Input(placeholder="Enter SQL, press Enter to run…", id="query")
         with Horizontal():
             yield Static("Plan will appear here.", id="plan")
-            yield Static("Findings will appear here.", id="findings")
+            with Vertical():
+                yield Static("Findings will appear here.", id="findings")
+                yield Static("", id="diff")
         yield Footer()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -45,3 +48,8 @@ class PgvetApp(App):
         self.query_one("#findings", Static).update(
             Group(f"[b]{len(result.findings)} finding(s)[/]", render_findings(result.findings))
         )
+        diff_widget = self.query_one("#diff", Static)
+        if result.diff is not None:
+            diff_widget.update(render_plan_diff(result.diff))
+        else:
+            diff_widget.update("")
