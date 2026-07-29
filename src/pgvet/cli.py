@@ -60,17 +60,34 @@ def plugins_listing() -> str:
     return "\n".join(lines)
 
 
+def _default_history_path() -> str:
+    from pathlib import Path
+
+    d = Path.cwd() / ".pgvet"
+    d.mkdir(exist_ok=True)
+    return str(d / "history.db")
+
+
 def launch_tui() -> int:
     from pgvet.config import Settings
     from pgvet.core.connection import Connection
+    from pgvet.core.queryhash import current_git_ref
+    from pgvet.storage.history import History
     from pgvet.tui.app import PgvetApp
 
-    conn = Connection.connect(Settings.from_env())
-    session = Session(conn=conn, registry=_registry())
+    conn = None
+    history = None
     try:
+        conn = Connection.connect(Settings.from_env())
+        history = History(_default_history_path())
+        session = Session(conn=conn, registry=_registry(),
+                          history=history, git_ref=current_git_ref())
         PgvetApp(analyze_query=session.run_query).run()
     finally:
-        conn.close()
+        if history is not None:
+            history.close()
+        if conn is not None:
+            conn.close()
     return 0
 
 

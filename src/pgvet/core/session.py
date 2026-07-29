@@ -4,13 +4,16 @@ connect-backed path used by the TUI and `pgvet report --sql`."""
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 
-from pgvet.core.explain import run_explain
+from pgvet.core.explain import parse_explain_json, run_explain
 from pgvet.core.findings import Finding, Severity
 from pgvet.core.introspect import introspect
+from pgvet.core.plandiff import PlanDiff, diff_plans
 from pgvet.core.planmodel import PlanTree
+from pgvet.core.queryhash import hash_query
 from pgvet.core.registry import Registry
 from pgvet.plugins.base import PlanContext
 
@@ -22,12 +25,20 @@ class RunResult:
     query: str
     plan: PlanTree
     findings: list[Finding]
+    previous: PlanTree | None = None
+    diff: PlanDiff | None = None
 
 
 class Session:
-    def __init__(self, conn, registry: Registry) -> None:
+    def __init__(self, conn, registry: Registry, history=None,
+                 git_ref: str | None = None, clock=None) -> None:
         self._conn = conn
         self._registry = registry
+        self._history = history
+        self._git_ref = git_ref
+        # clock() returns an ISO timestamp string; injected for deterministic tests.
+        self._clock = clock or (lambda: __import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc).isoformat())
 
     def analyze(self, ctx: PlanContext) -> list[Finding]:
         findings: list[Finding] = []
@@ -50,5 +61,20 @@ class Session:
     def run_query(self, sql: str) -> RunResult:
         plan = run_explain(self._conn, sql)
         schema = introspect(self._conn)
-        ctx = PlanContext(plan=plan, query=sql, schema=schema)
-        return RunResult(query=sql, plan=plan, findings=self.analyze(ctx))
+
+        previous = None
+        diff = None
+        if self._history is not None:
+            qhash = hash_query(sql)
+            prev_row = self._history.latest(qhash)
+            if prev_row is not None:
+                previous = parse_explain_json(json.loads(prev_row["plan_json"]))
+                diff = diff_plans(previous, plan)
+            self._history.record(
+                query_hash=qhash, git_ref=self._git_ref, recorded_at=self._clock(),
+                execution_time_ms=plan.execution_time_ms, plan_json=json.dumps(plan.to_payload()),
+            )
+
+        ctx = PlanContext(plan=plan, query=sql, schema=schema, previous=previous)
+        return RunResult(query=sql, plan=plan, findings=self.analyze(ctx),
+                         previous=previous, diff=diff)
