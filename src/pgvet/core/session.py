@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from pgvet.core.explain import parse_explain_json, run_explain
 from pgvet.core.findings import Finding, Severity
+from pgvet.core.hypo import HypoResult, try_hypothetical_index
 from pgvet.core.introspect import introspect
 from pgvet.core.plandiff import PlanDiff, diff_plans
 from pgvet.core.planmodel import PlanTree
@@ -78,3 +79,6 @@ class Session:
         ctx = PlanContext(plan=plan, query=sql, schema=schema, previous=previous)
         return RunResult(query=sql, plan=plan, findings=self.analyze(ctx),
                          previous=previous, diff=diff)
+
+    def try_hypothetical_index(self, sql: str, create_index_sql: str) -> HypoResult:
+        return try_hypothetical_index(self._conn, sql, create_index_sql)
