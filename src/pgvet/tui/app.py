@@ -23,14 +23,17 @@ class PgvetApp(App):
     """
     BINDINGS = [("ctrl+c", "quit", "Quit")]
 
-    def __init__(self, analyze_query: Callable[[str], RunResult]) -> None:
+    def __init__(self, analyze_query: Callable[[str], RunResult], hypothetical_query=None) -> None:
         super().__init__()
         self._analyze_query = analyze_query
+        self._hypothetical_query = hypothetical_query
         self.last_result: RunResult | None = None
+        self.last_hypo_result = None
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Input(placeholder="Enter SQL, press Enter to run…", id="query")
+        yield Input(placeholder="Candidate CREATE INDEX … (Enter to test hypothetically)", id="hypo")
         with Horizontal():
             yield Static("Plan will appear here.", id="plan")
             with Vertical():
@@ -39,7 +42,10 @@ class PgvetApp(App):
         yield Footer()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.run_analysis(event.value)
+        if event.input.id == "hypo":
+            self.run_hypothetical(event.value)
+        else:
+            self.run_analysis(event.value)
 
     def run_analysis(self, sql: str) -> None:
         result = self._analyze_query(sql)
@@ -53,3 +59,10 @@ class PgvetApp(App):
             diff_widget.update(render_plan_diff(result.diff))
         else:
             diff_widget.update("")
+
+    def run_hypothetical(self, create_index_sql: str) -> None:
+        if self._hypothetical_query is None or self.last_result is None:
+            return
+        result = self._hypothetical_query(self.last_result.query, create_index_sql)
+        self.last_hypo_result = result
+        self.query_one("#diff", Static).update(render_plan_diff(result.diff))
