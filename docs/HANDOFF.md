@@ -41,6 +41,10 @@ installs also work. Pick ONE:
   ```
   You also want the `psql` client to load sample data. It ships inside the container,
   so you can use `docker exec` (shown later), or install `psql` locally.
+  > **macOS note:** if you run host `psql "$DATABASE_URL" ...` commands (steps 5 and 8),
+  > make sure `psql` is on your `PATH` — after `brew install postgresql@16` you may need:
+  > `export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"`. Or skip host `psql`
+  > entirely and use `docker exec -it pgvet-pg psql ...`.
 
 - **macOS native:** install [Postgres.app](https://postgresapp.com/) or `brew install postgresql@16 && brew services start postgresql@16`.
 - **Windows native:** the [EDB installer](https://www.postgresql.org/download/windows/).
