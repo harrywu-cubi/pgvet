@@ -8,31 +8,34 @@ from __future__ import annotations
 import logging
 from importlib.metadata import entry_points as _entry_points
 
-from pgvet.plugins.base import Advisor
+from pgvet.plugins.base import Family
 
 log = logging.getLogger("pgvet.registry")
 
 ADVISOR_GROUP = "pgvet.advisors"
+INFERENCER_GROUP = "pgvet.inferencers"
 
 
 class Registry:
     def __init__(self) -> None:
-        self._advisors: dict[str, Advisor] = {}
+        self._plugins: dict[str, object] = {}
 
-    def register(self, plugin: Advisor) -> None:
-        if plugin.id in self._advisors:
+    def register(self, plugin) -> None:
+        if plugin.id in self._plugins:
             raise ValueError(f"duplicate plugin id: {plugin.id}")
-        self._advisors[plugin.id] = plugin
+        self._plugins[plugin.id] = plugin
 
     @property
-    def advisors(self) -> list[Advisor]:
-        return list(self._advisors.values())
+    def advisors(self) -> list:
+        return [p for p in self._plugins.values() if p.family == Family.ADVISOR]
 
-    def discover(self, entry_points=None) -> None:
-        """Load plugins from entry points. Each entry point loads to a callable
-        `register(registry)`. Pass `entry_points` explicitly in tests."""
+    @property
+    def inferencers(self) -> list:
+        return [p for p in self._plugins.values() if p.family == Family.INFERENCER]
+
+    def discover(self, entry_points=None, group: str = ADVISOR_GROUP) -> None:
         if entry_points is None:
-            entry_points = _entry_points(group=ADVISOR_GROUP)
+            entry_points = _entry_points(group=group)
         for ep in entry_points:
             try:
                 register_fn = ep.load()
@@ -43,5 +46,4 @@ class Registry:
     def load_builtins(self) -> None:
         """Register the advisors shipped in pgvet.plugins.advisors."""
         from pgvet.plugins.advisors import register_builtins
-
         register_builtins(self)
