@@ -1114,7 +1114,7 @@ class _FakeSession:
 
 def test_infer_report_text(monkeypatch):
     monkeypatch.setattr("pgvet.cli.Session", _FakeSession)
-    monkeypatch.setattr("pgvet.cli.Connection", type("C", (), {"connect": staticmethod(lambda s: object())}))
+    monkeypatch.setattr("pgvet.cli.Connection", type("C", (), {"connect": staticmethod(lambda s: type("Conn", (), {"close": lambda self: None})())}))
     monkeypatch.setattr("pgvet.cli.Settings", type("S", (), {"from_env": staticmethod(lambda: object())}))
     out = infer_report(fmt="text")
     assert "orders.status" in out
@@ -1123,7 +1123,7 @@ def test_infer_report_text(monkeypatch):
 
 def test_infer_report_json(monkeypatch):
     monkeypatch.setattr("pgvet.cli.Session", _FakeSession)
-    monkeypatch.setattr("pgvet.cli.Connection", type("C", (), {"connect": staticmethod(lambda s: object())}))
+    monkeypatch.setattr("pgvet.cli.Connection", type("C", (), {"connect": staticmethod(lambda s: type("Conn", (), {"close": lambda self: None})())}))
     monkeypatch.setattr("pgvet.cli.Settings", type("S", (), {"from_env": staticmethod(lambda: object())}))
     data = json.loads(infer_report(fmt="json"))
     assert data["findings"][0]["suggestion"]["sql"].endswith("SET NOT NULL")

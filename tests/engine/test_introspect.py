@@ -1,4 +1,4 @@
-from pgvet.core.introspect import introspect, COLUMNS_SQL, INDEXES_SQL
+from pgvet.core.introspect import introspect, COLUMNS_SQL, INDEXES_SQL, CONSTRAINTS_SQL
 
 
 class _FakeConn:
@@ -11,6 +11,8 @@ class _FakeConn:
             return self._columns
         if sql == INDEXES_SQL:
             return self._indexes
+        if sql == CONSTRAINTS_SQL:
+            return []
         raise AssertionError(f"unexpected sql: {sql!r}")
 
 

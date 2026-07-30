@@ -9,8 +9,10 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
+from pgvet.config import Settings
+from pgvet.core.connection import Connection
 from pgvet.core.explain import parse_explain_json
-from pgvet.core.registry import Registry
+from pgvet.core.registry import ADVISOR_GROUP, INFERENCER_GROUP, Registry
 from pgvet.core.session import Session
 from pgvet.plugins.base import PlanContext
 from pgvet.core.schemamodel import SchemaModel
@@ -19,7 +21,8 @@ from pgvet.core.schemamodel import SchemaModel
 def _registry() -> Registry:
     reg = Registry()
     reg.load_builtins()
-    reg.discover()
+    reg.discover(group=ADVISOR_GROUP)
+    reg.discover(group=INFERENCER_GROUP)
     return reg
 
 
@@ -52,11 +55,29 @@ def _render_text(findings) -> str:
     return "\n".join(lines)
 
 
+def infer_report(fmt: str = "text") -> str:
+    conn = Connection.connect(Settings.from_env())
+    try:
+        findings = Session(conn=conn, registry=_registry()).infer()
+    finally:
+        conn.close()
+    if fmt == "json":
+        return json.dumps({"findings": [_finding_dict(f) for f in findings]}, indent=2)
+    if not findings:
+        return "No candidate constraints found."
+    lines = []
+    for f in findings:
+        lines.append(f"{f.severity.value}: {f.title}")
+        if f.suggestion and f.suggestion.sql:
+            lines.append(f"    {f.suggestion.sql};")
+    return "\n".join(lines)
+
+
 def plugins_listing() -> str:
     reg = _registry()
     lines = ["Discovered plugins:"]
-    for a in reg.advisors:
-        lines.append(f"  [{a.family.value}] {a.id} — {a.name}")
+    for a in reg.advisors + reg.inferencers:
+        lines.append(f"  [{a.family.value}] {a.id} - {a.name}")
     return "\n".join(lines)
 
 
@@ -75,8 +96,6 @@ def _hypothetical_callable(session, available: bool):
 
 
 def launch_tui() -> int:
-    from pgvet.config import Settings
-    from pgvet.core.connection import Connection
     from pgvet.core.hypo import hypopg_available
     from pgvet.core.queryhash import current_git_ref
     from pgvet.storage.history import History
@@ -110,6 +129,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("tui", help="launch the interactive workbench")
     sub.add_parser("plugins", help="list discovered plugins")
 
+    inf = sub.add_parser("infer", help="infer undeclared constraints from live data")
+    inf.add_argument("--format", default="text", choices=["text", "json"])
+
     args = parser.parse_args(argv)
     try:
         if args.command == "report":
@@ -117,6 +139,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "plugins":
             print(plugins_listing())
+            return 0
+        if args.command == "infer":
+            print(infer_report(fmt=args.format))
             return 0
         if args.command == "tui":
             return launch_tui()

@@ -14,6 +14,7 @@ from typing import Iterable
 
 from pgvet.core.findings import Finding
 from pgvet.core.planmodel import PlanTree
+from pgvet.core.sampler import Sampler
 from pgvet.core.schemamodel import SchemaModel
 
 
@@ -43,4 +44,26 @@ class Advisor(ABC):
 
     @abstractmethod
     def run(self, ctx: PlanContext) -> Iterable[Finding]:
+        ...
+
+
+@dataclass
+class SchemaContext:
+    schema: SchemaModel
+    sampler: Sampler
+
+
+class Inferencer(ABC):
+    """A function over a SchemaContext (schema + a Sampler for live data stats)
+    that yields Findings carrying candidate DDL."""
+
+    id: str
+    name: str
+    family: Family = Family.INFERENCER
+
+    def applies_to(self, ctx: SchemaContext) -> bool:  # noqa: ARG002
+        return True
+
+    @abstractmethod
+    def run(self, ctx: SchemaContext) -> Iterable[Finding]:
         ...
