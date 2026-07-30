@@ -4,7 +4,7 @@ added when the drift family lands)."""
 
 from __future__ import annotations
 
-from pgvet.core.schemamodel import Column, Index, SchemaModel, Table
+from pgvet.core.schemamodel import Column, Constraint, Index, SchemaModel, Table
 
 COLUMNS_SQL = """
 SELECT table_schema, table_name, column_name, data_type, is_nullable, column_default
@@ -28,6 +28,23 @@ JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
 WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
 GROUP BY t.relname, i.relname, ix.indisunique, ix.indpred, ix.indrelid
 ORDER BY t.relname, i.relname
+"""
+
+CONSTRAINTS_SQL = """
+SELECT t.relname AS table_name,
+       c.conname AS constraint_name,
+       c.contype AS kind,
+       array_agg(a.attname ORDER BY k.ord) AS column_names,
+       pg_get_constraintdef(c.oid) AS definition
+FROM pg_constraint c
+JOIN pg_class t ON t.oid = c.conrelid
+JOIN pg_namespace n ON n.oid = t.relnamespace
+JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+  AND c.contype IN ('p', 'f', 'u', 'c')
+GROUP BY t.relname, c.conname, c.contype, c.oid
+ORDER BY t.relname, c.conname
 """
 
 
@@ -56,6 +73,19 @@ def introspect(conn) -> SchemaModel:
                 columns=list(row["column_names"]),
                 unique=bool(row["is_unique"]),
                 predicate=row["predicate"],
+            )
+        )
+
+    for row in conn.fetch_all(CONSTRAINTS_SQL):
+        table = tables.get(row["table_name"])
+        if table is None:
+            continue
+        table.constraints.append(
+            Constraint(
+                name=row["constraint_name"],
+                kind=row["kind"],
+                columns=list(row["column_names"]),
+                definition=row["definition"],
             )
         )
 
