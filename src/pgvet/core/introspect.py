@@ -1,6 +1,6 @@
-"""Live-DB schema introspection → SchemaModel. Kept intentionally small for the
-MVP: tables, columns, and indexes (constraints beyond unique-index inference are
-added when the drift family lands)."""
+"""Live-DB schema introspection → SchemaModel: tables, columns, indexes, and
+PK/FK/unique/check constraints. (Resolving FK-referenced tables into relationships
+belongs to the future drift family.)"""
 
 from __future__ import annotations
 

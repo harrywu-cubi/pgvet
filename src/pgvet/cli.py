@@ -12,7 +12,7 @@ from pathlib import Path
 from pgvet.config import Settings
 from pgvet.core.connection import Connection
 from pgvet.core.explain import parse_explain_json
-from pgvet.core.registry import Registry
+from pgvet.core.registry import ADVISOR_GROUP, INFERENCER_GROUP, Registry
 from pgvet.core.session import Session
 from pgvet.plugins.base import PlanContext
 from pgvet.core.schemamodel import SchemaModel
@@ -21,7 +21,8 @@ from pgvet.core.schemamodel import SchemaModel
 def _registry() -> Registry:
     reg = Registry()
     reg.load_builtins()
-    reg.discover()
+    reg.discover(group=ADVISOR_GROUP)
+    reg.discover(group=INFERENCER_GROUP)
     return reg
 
 
@@ -75,7 +76,7 @@ def infer_report(fmt: str = "text") -> str:
 def plugins_listing() -> str:
     reg = _registry()
     lines = ["Discovered plugins:"]
-    for a in reg.advisors:
+    for a in reg.advisors + reg.inferencers:
         lines.append(f"  [{a.family.value}] {a.id} — {a.name}")
     return "\n".join(lines)
 
