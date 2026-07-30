@@ -68,9 +68,16 @@ def _default_history_path() -> str:
     return str(d / "history.db")
 
 
+def _hypothetical_callable(session, available: bool):
+    if not available:
+        return None
+    return session.try_hypothetical_index
+
+
 def launch_tui() -> int:
     from pgvet.config import Settings
     from pgvet.core.connection import Connection
+    from pgvet.core.hypo import hypopg_available
     from pgvet.core.queryhash import current_git_ref
     from pgvet.storage.history import History
     from pgvet.tui.app import PgvetApp
@@ -82,7 +89,8 @@ def launch_tui() -> int:
         history = History(_default_history_path())
         session = Session(conn=conn, registry=_registry(),
                           history=history, git_ref=current_git_ref())
-        PgvetApp(analyze_query=session.run_query).run()
+        hypo_fn = _hypothetical_callable(session, hypopg_available(conn))
+        PgvetApp(analyze_query=session.run_query, hypothetical_query=hypo_fn).run()
     finally:
         if history is not None:
             history.close()
