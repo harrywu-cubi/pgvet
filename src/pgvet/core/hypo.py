@@ -5,6 +5,12 @@ a hypothetical index only affects the planner's estimates."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from pgvet.core.explain import run_explain
+from pgvet.core.plandiff import PlanDiff, diff_plans
+from pgvet.core.planmodel import PlanTree
+
 
 def hypopg_available(conn) -> bool:
     """True if the HypoPG extension is installed in the connected database."""
@@ -24,13 +30,6 @@ def create_hypothetical_index(conn, create_index_sql: str) -> int:
 def reset_hypothetical(conn) -> None:
     """Drop all hypothetical indexes for this session."""
     conn.fetch_one("SELECT hypopg_reset()")
-
-
-from dataclasses import dataclass
-
-from pgvet.core.explain import run_explain
-from pgvet.core.plandiff import PlanDiff, diff_plans
-from pgvet.core.planmodel import PlanTree
 
 
 @dataclass
