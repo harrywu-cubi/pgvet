@@ -1,9 +1,7 @@
 # pgvet — Architecture & Code Walkthrough
 
-**Read this once and you can explain pgvet's design and code — including in an
-interview.** It goes top-down: the idea, the shape, then each part with the *actual*
-code and the *why* behind it, and ends with a flow trace, the design tradeoffs, and a
-Q&A you can rehearse.
+A top-down tour of pgvet's design: the idea, the shape, then each part with the *actual*
+code and the *why* behind it, ending with a flow trace and the key design tradeoffs.
 
 Terms you may not know are defined in the **Glossary** at the bottom — jump there first
 if "execution plan" or "sequential scan" are new to you.
@@ -33,7 +31,7 @@ Three design pillars follow from that idea:
 
 ---
 
-## 2. The mental model (say this first in an interview)
+## 2. The mental model
 
 > "pgvet runs `EXPLAIN` on your query, normalizes the result into a plain Python plan
 > tree, and then runs a list of plugin *advisors* over that tree; each advisor is a pure
@@ -471,7 +469,7 @@ objects), tested on their own.
 
 ## 10. Testing strategy (and why it's DB-free)
 
-- **57 tests, 92% coverage**, and **the whole suite runs with no database.** How:
+- **115 tests, and the whole suite runs with no database.** How:
   - Pure model + advisor tests build a `PlanContext` by hand.
   - Engine tests (`explain`, `introspect`, `session`) use a **fake connection** with the
     same tiny surface (`fetch_one`/`fetch_all`) or **recorded fixtures** (a saved
@@ -486,7 +484,7 @@ The reason this is possible is the golden rule from §3: because the connection 
 
 ---
 
-## 11. Design decisions & tradeoffs (rehearse these)
+## 11. Design decisions & tradeoffs
 
 | Decision | Why | Tradeoff / what you'd change at scale |
 |---|---|---|
@@ -498,58 +496,27 @@ The reason this is possible is the golden rule from §3: because the connection 
 | **Table keyed by name, not schema.table** | Postgres `EXPLAIN` only reports the bare relation name | Multi-schema DBs with same-named tables can collide; noted as a follow-up |
 | **DB-free test suite** | Fast, deterministic, runs anywhere incl. locked-down machines | Live paths need separate manual validation |
 
-Being able to name a *tradeoff* for each decision is what makes you sound like the author,
-not a narrator.
-
 ---
 
-## 12. Limitations & roadmap (know what it does NOT do)
+## 12. What's built, and what's next
 
-- **MVP scope.** Today it's the query-and-index *workbench*: run a query, read the plan,
-  get advice. No history, no hypothetical indexes yet.
-- **Planned, each with a written plan already in `docs/superpowers/plans/`:**
-  - **M4** — plan *diffing* + a local history store ("when did this get slow?").
-  - **M5** — *hypothetical* index testing via the HypoPG extension (try an index without
-    building it).
-  - **M6** — two more plugin families: *constraint inference* (infer undeclared
-    constraints from data) and *ORM↔DB drift* detection. These have open design questions
-    and need a design pass first.
-- **Known rough edges:** multi-schema table-name collisions; the TUI runs the query
-  synchronously (a very slow `EXPLAIN ANALYZE` would briefly block the UI); one advisor
-  reads `node.raw` directly.
+Beyond the core + advisor family described above, three more capabilities ship on the
+*same* plugin host (new context types, no core surgery) — which is the clearest evidence
+the extensibility design holds:
 
----
+- **Plan diffing + history** — the workbench records each run to a local SQLite store and
+  diffs a query against its previous plan ("when did this get slow?").
+- **Hypothetical indexes** — with the HypoPG extension, estimate an index's effect without
+  building it.
+- **Constraint inference** (`pgvet infer`) — a *second plugin family* that proposes
+  undeclared constraints (foreign keys, unique, enum, not-null) inferred from the data, via
+  a `Sampler` that keeps all inference SQL in one place.
 
-## 13. Explain-it scripts + interview Q&A
+Next: **ORM↔DB drift** detection (compare SQLAlchemy/Django models to the live schema).
 
-**60-second pitch:** "pgvet is a local PostgreSQL query doctor. You give it a query in a
-terminal UI; it runs `EXPLAIN`, turns the plan into a clean Python tree, and runs a set of
-plugin *advisors* that each flag one problem — a missing index, a bad row estimate, a sort
-spilling to disk — with plain-English advice. The design point is that the core is tiny
-and every check is a plugin, so you extend it by writing a new plugin, not editing the
-core. The UI and CLI are both thin views over one engine, and the whole test suite runs
-without a database because the connection is injected."
-
-**Likely questions and honest answers:**
-
-- *"Why plugins instead of just functions?"* — Discovery + isolation. Plugins register
-  via entry points so a separate package can add checks without forking, and a broken
-  plugin is skipped rather than crashing the tool. Functions would couple every check into
-  the core.
-- *"How do you handle different Postgres versions?"* — All version-specific JSON parsing
-  is in `explain.py::parse_explain_json`. Everything downstream uses the normalized
-  `PlanNode`. Unknown node types degrade to `UNKNOWN` with the raw JSON preserved, so it
-  won't crash on a plan shape it hasn't seen.
-- *"How is it tested without a database?"* — The connection is a 2-method wrapper injected
-  everywhere; advisors are pure functions over a context; engine tests use fakes and
-  recorded `EXPLAIN` fixtures. 57 tests, 92% coverage, zero DB.
-- *"What was the hardest part?"* — Deciding the boundary of the normalized plan model:
-  rich enough for advisors, but not leaking Postgres specifics. And getting the per-loop
-  vs total row-count semantics right (`total_actual_rows`), which is a common plan-reading
-  bug.
-- *"What would you do next / at scale?"* — Plan diffing + history (M4), hypothetical
-  indexes (M5), and two more plugin families (M6). At scale I'd revisit the `walk()`
-  traversal, key schema by `schema.table`, and move the slow live query off the UI thread.
+**Known rough edges:** multi-schema table-name collisions; the TUI runs the query
+synchronously (a very slow `EXPLAIN ANALYZE` would briefly block the UI); a couple of spots
+to revisit at scale (the `walk()` traversal; keying schema by `schema.table`).
 
 ---
 

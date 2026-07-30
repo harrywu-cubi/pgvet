@@ -79,8 +79,8 @@ uv run pgvet report --plan-file slow_query.json
 uv run pgvet report --plan-file slow_query.json --format json
 ```
 
-> New to it? `docs/HANDOFF.md` is a step-by-step walkthrough from an empty machine to
-> a working setup (including a Docker Postgres + sample data).
+> Want sample data to try it against? `docs/examples/seed.sql` creates a small demo
+> schema (with rows that actually trigger findings): `psql "$DATABASE_URL" -f docs/examples/seed.sql`.
 
 ## Commands
 
