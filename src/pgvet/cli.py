@@ -77,7 +77,7 @@ def plugins_listing() -> str:
     reg = _registry()
     lines = ["Discovered plugins:"]
     for a in reg.advisors + reg.inferencers:
-        lines.append(f"  [{a.family.value}] {a.id} — {a.name}")
+        lines.append(f"  [{a.family.value}] {a.id} - {a.name}")
     return "\n".join(lines)
 
 
