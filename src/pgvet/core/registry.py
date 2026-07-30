@@ -44,6 +44,8 @@ class Registry:
                 log.warning("skipping plugin entry point %r: %s", ep.name, exc)
 
     def load_builtins(self) -> None:
-        """Register the advisors shipped in pgvet.plugins.advisors."""
-        from pgvet.plugins.advisors import register_builtins
-        register_builtins(self)
+        """Register the advisors and inferencers shipped with pgvet."""
+        from pgvet.plugins.advisors import register_builtins as register_advisors
+        from pgvet.plugins.inferencers import register_builtins as register_inferencers
+        register_advisors(self)
+        register_inferencers(self)
