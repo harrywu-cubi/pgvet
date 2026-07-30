@@ -16,7 +16,8 @@ from pgvet.core.plandiff import PlanDiff, diff_plans
 from pgvet.core.planmodel import PlanTree
 from pgvet.core.queryhash import hash_query
 from pgvet.core.registry import Registry
-from pgvet.plugins.base import PlanContext
+from pgvet.core.sampler import Sampler
+from pgvet.plugins.base import PlanContext, SchemaContext
 
 log = logging.getLogger("pgvet.session")
 
@@ -79,6 +80,25 @@ class Session:
         ctx = PlanContext(plan=plan, query=sql, schema=schema, previous=previous)
         return RunResult(query=sql, plan=plan, findings=self.analyze(ctx),
                          previous=previous, diff=diff)
+
+    def infer(self) -> list[Finding]:
+        schema = introspect(self._conn)
+        ctx = SchemaContext(schema=schema, sampler=Sampler(self._conn))
+        findings: list[Finding] = []
+        for inferencer in self._registry.inferencers:
+            try:
+                findings.extend(inferencer.run(ctx))
+            except Exception as exc:  # noqa: BLE001 — isolate one bad plugin
+                log.warning("inferencer %s failed: %s", inferencer.id, exc)
+                findings.append(
+                    Finding(
+                        plugin_id=inferencer.id,
+                        severity=Severity.WARN,
+                        title=f"Inferencer {inferencer.id} failed",
+                        detail=str(exc),
+                    )
+                )
+        return findings
 
     def try_hypothetical_index(self, sql: str, create_index_sql: str) -> HypoResult:
         return try_hypothetical_index(self._conn, sql, create_index_sql)
